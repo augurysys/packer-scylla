@@ -1,0 +1,34 @@
+[Unit]
+Description=consul
+After=data_disk.service
+
+[Service]
+ExecStartPre=/bin/mkdir -p /etc/consul.d
+ExecStart=/bin/bash -c "\
+        consul=$(curl -s -H \"Metadata-Flavor: Google\" http://metadata.google.internal/computeMetadata/v1/instance/attributes/consul);\
+        if [ \"$consul\" = \"0\" ]; then exit 0; fi;\
+        dc='';\
+        args='';\
+        if [ -z \"$consul\" ]; then \
+            dc=$(curl -s -H \"Metadata-Flavor: Google\" http://metadata.google.internal/computeMetadata/v1/instance/attributes/dc);\
+            /usr/local/bin/consul agent \
+                -config-dir /etc/consul.d \
+                -data-dir=/mnt/disks/data/consul \
+                -datacenter $dc \
+                -retry-join \"provider=gce project_name=augury-iot tag_value=consul-$dc\";\
+        else \
+            dc=$(echo $consul | cut -d: -f1);\
+            /usr/local/bin/consul agent \
+                -config-dir /etc/consul.d \
+                -data-dir=/mnt/disks/data/consul \
+                -datacenter $dc \
+                $(echo $consul | cut -d: -f2 | awk -F',' '{for(i=1; i<=NF; i++) { print \"-retry-join \" $i }}');\
+        fi"
+
+ExecReload=/bin/kill -HUP $MAINPID
+SyslogIdentifier=consul
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

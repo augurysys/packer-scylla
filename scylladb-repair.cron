@@ -1,0 +1,5 @@
+#!/bin/bash
+consul=$(/usr/bin/curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/consul)
+if [ "$consul" = "0" ]; then exit 0; fi
+
+/usr/local/bin/consul lock scylladb-repair /usr/bin/nodetool repair -pr
