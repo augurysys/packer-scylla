@@ -3,7 +3,7 @@
 IP=$(hostname -I | tr -d ' ')
 region=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/zone | cut -d/ -f4 | cut -d- -f1-2)
 dc=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/dc)
-SEEDS=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/project/attributes/scylladb-seeds)
+SEEDS=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/project/attributes/scylladb-seeds-${dc})
 
 cat > /etc/scylla/scylla.yaml << EOF
 # Scylla storage config YAML
@@ -22,7 +22,7 @@ cat > /etc/scylla/scylla.yaml << EOF
 # one logical cluster from joining another.
 # It is recommended to change the default value when creating a new cluster.
 # You can NOT modify this value for an existing cluster
-cluster_name: 'Augury IoT'
+cluster_name: 'algo'
 
 # This defines the number of tokens randomly assigned to this node on the ring
 # The more tokens, relative to other nodes, the larger the proportion of data
