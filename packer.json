@@ -1,7 +1,8 @@
 {
     "variables": {
         "project_id": "",
-        "consul_url": "https://releases.hashicorp.com/consul/1.0.6/consul_1.0.6_linux_amd64.zip"
+        "scylla_manager_agent_auth_token": "",
+        "consul_url": "https://releases.hashicorp.com/consul/1.7.2/consul_1.7.2_linux_amd64.zip"
     },
     "builders": [
         {
@@ -10,7 +11,7 @@
           "source_image_family": "centos-7",
           "zone": "us-east1-b",
           "image_family": "scylladb",
-          "image_name": "scylladb-{{timestamp}}",
+          "image_name": "scylladb-enterprise-{{timestamp}}",
           "ssh_username": "admin",
           "subnetwork": "default"
         }
@@ -18,8 +19,13 @@
     "provisioners": [
         {
             "type": "file",
-            "source": "data_disk.service",
-            "destination": "/tmp/data_disk.service"
+            "source": "data-disk.sh",
+            "destination": "/tmp/data-disk.sh"
+        },
+        {
+            "type": "file",
+            "source": "data-disk.service",
+            "destination": "/tmp/data-disk.service"
         },
         {
             "type": "file",
@@ -37,33 +43,31 @@
             "destination": "/tmp/consul.service"
         },
         {
-            "type": "file",
-            "source": "scylladb-repair.cron",
-            "destination": "/tmp/scylladb-repair.cron"
-        },
-        {
             "type": "shell",
             "inline": [
                 "#!/bin/bash",
                 "sudo yum remove -y abrt",
-                "sudo yum install -y epel-release wget unzip",
-                "sudo wget -O /etc/yum.repos.d/scylla.repo http://repositories.scylladb.com/scylla/repo/c0ff342242434efe6a757722c44da73f/centos/scylladb-2.1.repo",
-                "sudo yum install -y scylla",
-                "sudo mv /tmp/data_disk.service /etc/systemd/system/data_disk.service",
+                "sudo yum install -y epel-release wget unzip mdadm",
+                "sudo wget -O /etc/yum.repos.d/scylla.repo http://repositories.scylladb.com/scylla/repo/SCYL092e-a90a-40d8-8b9c-f108b01b67f9/centos/scylladb-2019.1.repo",
+                "sudo yum install -y scylla-enterprise",
+                "sudo curl -o /etc/yum.repos.d/scylla.repo -L http://repositories.scylladb.com/scylla/repo/SCYL092e-a90a-40d8-8b9c-f108b01b67f9/centos/scylladb-manager-2.0.repo",
+                "sudo yum install -y scylla-manager-agent",
+                "sudo mv /tmp/data-disk.service /etc/systemd/system/data-disk.service",
+                "sudo mv /tmp/data-disk.sh /usr/local/bin",
+                "sudo chmod +x /usr/local/bin/data-disk.sh",
                 "sudo mv /tmp/scylla-settings.service /etc/systemd/system/scylla-settings.service",
                 "sudo mv /tmp/scylla-settings.sh /usr/local/bin",
                 "sudo chmod +x /usr/local/bin/scylla-settings.sh",
-                "sudo systemctl enable data_disk.service",
+                "sudo systemctl enable data-disk.service",
                 "sudo systemctl enable scylla-settings.service",
                 "sudo sed -ie 's|SCYLLA_HOME=/var/lib/scylla|SCYLLA_HOME=/mnt/disks/data/scylla|' /etc/sysconfig/scylla-server",
                 "sudo sed -ie 's|/var/lib/scylla|/mnt/disks/data/scylla|g' /etc/scylla/scylla.yaml",
                 "sudo systemctl enable scylla-server.service",
+                "sudo systemctl enable scylla-manager-agent",
                 "sudo setenforce 0",
                 "sudo mv /tmp/consul.service /etc/systemd/system/consul.service && sudo systemctl enable consul.service",
 
                 "wget -O /tmp/consul.zip {{user `consul_url`}} && sudo unzip /tmp/consul.zip -d /usr/local/bin/",
-                "sudo mv /tmp/scylladb-repair.cron /etc/cron.weekly/scylladb-repair.cron",
-                "sudo chmod +x /etc/cron.weekly/scylladb-repair.cron",
                 "sudo setenforce 1"
             ]
         }

@@ -1,0 +1,11 @@
+[Unit]
+Description=data_disk
+After=google-instance-setup.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/data-disk.sh
+
+
+[Install]
+WantedBy=multi-user.target

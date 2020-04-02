@@ -4,6 +4,7 @@ IP=$(hostname -I | tr -d ' ')
 region=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/zone | cut -d/ -f4 | cut -d- -f1-2)
 dc=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/dc)
 SEEDS=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/project/attributes/scylladb-seeds-${dc})
+scylla_manager_agent_auth_token=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/project/attributes/scylla-manager-agent-auth-token)
 
 cat > /etc/scylla/scylla.yaml << EOF
 # Scylla storage config YAML
@@ -29,7 +30,7 @@ cluster_name: 'algo'
 # that this node will store. You probably want all nodes to have the same number
 # of tokens assuming they have equal hardware capability.
 #
-# If you already have a cluster with 1 token per node, and wish to migrate to 
+# If you already have a cluster with 1 token per node, and wish to migrate to
 # multiple tokens per node, see http://wiki.apache.org/cassandra/Operations
 num_tokens: 256
 
@@ -75,7 +76,7 @@ commitlog_segment_size_in_mb: 32
 # seed_provider class_name is saved for future use.
 # seeds address are mandatory!
 seed_provider:
-    # Addresses of hosts that are deemed contact points. 
+    # Addresses of hosts that are deemed contact points.
     # Scylla nodes use this list of hosts to find each other and learn
     # the topology of the ring.  You must change this if you are running
     # multiple nodes!
@@ -234,8 +235,8 @@ batch_size_fail_threshold_in_kb: 50
 # authorizer: AllowAllAuthorizer
 
 # initial_token allows you to specify tokens manually.  While you can use # it with
-# vnodes (num_tokens > 1, above) -- in which case you should provide a 
-# comma-separated list -- it's primarily used when adding nodes # to legacy clusters 
+# vnodes (num_tokens > 1, above) -- in which case you should provide a
+# comma-separated list -- it's primarily used when adding nodes # to legacy clusters
 # that do not have vnodes enabled.
 # initial_token:
 
@@ -384,7 +385,7 @@ partitioner: org.apache.cassandra.dht.Murmur3Partitioner
 # well as caches.  Experiments show that JEMAlloc saves some memory
 # than the native GCC allocator (i.e., JEMalloc is more
 # fragmentation-resistant).
-# 
+#
 # Supported values are: NativeAllocator, JEMallocAllocator
 #
 # If you intend to use JEMallocAllocator you have to install JEMalloc as library and
@@ -561,7 +562,7 @@ commitlog_total_space_in_mb: -1
 # snapshot_before_compaction: false
 
 # Whether or not a snapshot is taken of the data before keyspace truncation
-# or dropping of column families. The STRONGLY advised default of true 
+# or dropping of column families. The STRONGLY advised default of true
 # should be used to provide data safety. If you set this flag to false, you will
 # lose data on truncation or drop.
 # auto_snapshot: true
@@ -601,7 +602,7 @@ commitlog_total_space_in_mb: -1
 #
 # concurrent_compactors defaults to the smaller of (number of disks,
 # number of cores), with a minimum of 2 and a maximum of 8.
-# 
+#
 # If your data directories are backed by SSD, you should increase this
 # to the number of cores.
 #concurrent_compactors: 1
@@ -619,7 +620,7 @@ commitlog_total_space_in_mb: -1
 
 # When compacting, the replacement sstable(s) can be opened before they
 # are completely written, and used in place of the prior sstables for
-# any range that has been written. This helps to smoothly transfer reads 
+# any range that has been written. This helps to smoothly transfer reads
 # between the sstables, reducing page cache churn and keeping hot rows hot
 # sstable_preemptive_open_interval_in_mb: 50
 
@@ -646,7 +647,7 @@ commitlog_total_space_in_mb: -1
 # Enable operation timeout information exchange between nodes to accurately
 # measure request timeouts.  If disabled, replicas will assume that requests
 # were forwarded to them instantly by the coordinator, which means that
-# under overload conditions we will waste that much extra time processing 
+# under overload conditions we will waste that much extra time processing
 # already-timed-out requests.
 #
 # Warning: before enabling this property make sure to ntp is installed
@@ -662,7 +663,7 @@ commitlog_total_space_in_mb: -1
 
 # controls how often to perform the more expensive part of host score
 # calculation
-# dynamic_snitch_update_interval_in_ms: 100 
+# dynamic_snitch_update_interval_in_ms: 100
 
 # controls how often to reset all host scores, allowing a bad host to
 # possibly recover
@@ -694,7 +695,7 @@ commitlog_total_space_in_mb: -1
 # NoScheduler - Has no options
 # RoundRobin
 #  - throttle_limit -- The throttle_limit is the number of in-flight
-#                      requests per client.  Requests beyond 
+#                      requests per client.  Requests beyond
 #                      that limit are queued up until
 #                      running requests can complete.
 #                      The value of 80 here is twice the number of
@@ -717,8 +718,8 @@ commitlog_total_space_in_mb: -1
 # the request scheduling. Currently the only valid option is keyspace.
 # request_scheduler_id: keyspace
 
-# Enable or disable inter-node encryption. 
-# You must also generate keys and provide the appropriate key and trust store locations and passwords. 
+# Enable or disable inter-node encryption.
+# You must also generate keys and provide the appropriate key and trust store locations and passwords.
 # No custom encryption options are currently enabled. The available options are:
 #
 # The available internode options are : all, none, dc, rack
@@ -806,6 +807,118 @@ commitlog_total_space_in_mb: -1
 #
 # Keep at 12 for new clusters.
 murmur3_partitioner_ignore_msb_bits: 12
+EOF
+
+cat > /etc/scylla-manager-agent/scylla-manager-agent.yaml << EOF
+# Scylla Manager Agent config YAML
+
+# Specify authentication token, the auth_token needs to be the same for all the
+# nodes in a cluster. Use scyllamgr_auth_token_gen to generate the auth_token
+# value.
+auth_token: $scylla_manager_agent_auth_token
+
+# Bind REST API to the specified TCP address using HTTPS protocol. By default
+# Scylla Manager Agent uses Scylla listen/broadcast address that is read from
+# the Scylla API (see scylla section).
+#https: 0.0.0.0:10001
+
+# TLS certificate and key files to use with HTTPS. To regenerate the files use
+# scyllamgr_ssl_cert_gen script shipped with the Scylla Manager Agent.
+#tls_cert_file: /var/lib/scylla-manager/scylla_manager.crt
+#tls_key_file: /var/lib/scylla-manager/scylla_manager.key
+
+# Bind prometheus API to the specified TCP address using HTTP protocol.
+# By default it binds to all network interfaces but you can restrict it
+# by specifying it like this 127:0.0.1:56090 or any other combination
+# of ip and port.
+#prometheus: ':56090'
+
+# Start a debug server that allows to run pporf profiling on demand on a live
+# system, by default the server is not running.
+#debug: 127.0.0.1:56112
+
+# CPU to run Scylla Manager Agent on. By default the agent would read Scylla
+# configuration at /etc/scylla.d/cpuset.conf and try to find a core not used by
+# Scylla. If that's not possible user can specify a core to run agent on.
+#cpu: 0
+
+# Logging configuration.
+#logger:
+# Available log levels are error, info and debug.
+#  level: info
+
+# Copy api_address and api_port values from /etc/scylla/scylla.yaml. All the
+# needed Scylla configuration options are read from the API.
+#scylla:
+#  api_address: 0.0.0.0
+#  api_port: 10000
+
+# Backup S3 client configuration.
+#
+# Note that when running in AWS Scylla Manger Agent can read hosts IAM role.
+# It's recommended to define access rules based on IAM roles.
+# https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html
+#
+# To test bucket accessibility use `scylla-manager-agent check-location` command.
+# Example:
+# scylla-manager-agent check-location --location s3:scylla-manager-backup
+#
+# Sample IAM policy for "scylla-manager-backup" bucket:
+#
+# {
+#      "Version": "2012-10-17",
+#      "Statement": [
+#          {
+#              "Effect": "Allow",
+#              "Action": [
+#                  "s3:GetBucketLocation",
+#                  "s3:ListBucket",
+#                  "s3:ListBucketMultipartUploads"
+#              ],
+#              "Resource": [
+#                  "arn:aws:s3:::scylla-manager-backup"
+#              ]
+#          },
+#          {
+#              "Effect": "Allow",
+#              "Action": [
+#                  "s3:PutObject",
+#                  "s3:GetObject",
+#                  "s3:DeleteObject",
+#                  "s3:AbortMultipartUpload",
+#                  "s3:ListMultipartUploadParts"
+#              ],
+#              "Resource": [
+#                  "arn:aws:s3:::scylla-manager-backup/*"
+#              ]
+#          }
+#      ]
+#  }
+#
+#s3:
+# S3 credentials, it's recommended to use IAM roles if possible, otherwise set
+# your AWS Access Key ID and AWS Secret Access Key (password) here.
+#  access_key_id:
+#  secret_access_key:
+#
+# Region to connect to, if running in AWS EC2 instance region is set
+# to the local region by default.
+#  region:
+#
+# Endpoint for S3 API, only relevant when using S3 compatible API.
+#  endpoint:
+#
+# The server-side encryption algorithm used when storing this object in S3.
+# If using KMS ID you must provide the ARN of Key.
+#  server_side_encryption:
+#  sse_kms_key_id:
+#
+# Number of files uploaded concurrently, by default it's max(nr. CPUs/2, 5).
+#  upload_concurrency:
+#
+# AWS S3 Transfer acceleration
+# https://docs.aws.amazon.com/AmazonS3/latest/dev/transfer-acceleration-examples.html
+#  use_accelerate_endpoint: false
 EOF
 
 cat > /etc/scylla/cassandra-rackdc.properties << EOF

@@ -1,11 +1,11 @@
 [Unit]
 Description=scylla-settings
-After=data_disk.service
-Before=scylla-server.service consul.service
+After=data-disk.service
+Before=scylla-manager-agent.service scylla-server.service consul.service
 
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/scylla-settings.sh
-    
+
 [Install]
 WantedBy=multi-user.target
